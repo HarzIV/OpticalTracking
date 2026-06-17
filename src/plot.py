@@ -24,7 +24,8 @@ class Matplotlib3DView(ttk.Frame):
         self._setup_axes()
 
         # Set up the tracking points        
-        self.points = Math.arrangePoints(3, 1)
+        self.trackingPoints = Math.arrangePoints(3, 1)
+        self.trackingPointsCurrently = Math.arrangePoints(3, 1) # Current position of points, after aplying all transformations.
 
         # Set up the camera
         self.Camera = Camera("OV2640", (3.59, 2.684), 3.6)
@@ -47,7 +48,9 @@ class Matplotlib3DView(ttk.Frame):
         self._setup_axes()
         self.placeCamera()
         # self.drawLocalCoordinateSystem(x, y, z, roll_deg, pitch_deg, yaw_deg)
-        self.drawPoints(self.points, x, y, z, roll_deg, pitch_deg, yaw_deg)
+        self.drawPoints(self.trackingPoints, x, y, z, roll_deg, pitch_deg, yaw_deg)
+        
+        self.projectPoints()
         
         self.canvas.draw_idle()
 
@@ -55,16 +58,16 @@ class Matplotlib3DView(ttk.Frame):
         self.ax.clear()
         self._setup_axes()
 
-        K = Math.transformation_matrix(x_origin, y_origin, z_origin, roll_deg, pitch_deg, yaw_deg)
+        H = Math.transformation_matrix(x_origin, y_origin, z_origin, roll_deg, pitch_deg, yaw_deg)
 
         origin = np.array([x_origin, y_origin, z_origin])
 
         axis_len = 1.5
         
         # Using homogenous vectors.
-        x_axis = K @ np.array([[axis_len], [0], [0], [1]])
-        y_axis = K @ np.array([[0], [axis_len], [0], [1]])
-        z_axis = K @ np.array([[0], [0], [axis_len], [1]])
+        x_axis = H @ np.array([[axis_len], [0], [0], [1]])
+        y_axis = H @ np.array([[0], [axis_len], [0], [1]])
+        z_axis = H @ np.array([[0], [0], [axis_len], [1]])
         self.ax.quiver(
             origin[0], origin[1], origin[2],
             x_axis[0], x_axis[1], x_axis[2],
@@ -95,10 +98,10 @@ class Matplotlib3DView(ttk.Frame):
         width, height = self.Camera.sensorSize
 
         verticies = [[
-            (x+width/2, y+height/2, z-self.Camera.focalDistance),
-            (x+width/2, y-height/2, z-self.Camera.focalDistance),
-            (x-width/2, y-height/2, z-self.Camera.focalDistance),
-            (x-width/2, y+height/2, z-self.Camera.focalDistance)
+            (x+width/2, y+height/2, z-self.Camera.focalLength),
+            (x+width/2, y-height/2, z-self.Camera.focalLength),
+            (x-width/2, y-height/2, z-self.Camera.focalLength),
+            (x-width/2, y+height/2, z-self.Camera.focalLength)
         ]]
         
         # Rectangle that show the sensor
@@ -113,9 +116,19 @@ class Matplotlib3DView(ttk.Frame):
         
         self.ax.scatter(x, y, z, color="lightblue", alpha=0.9)
 
-    def drawPoints(self, points, x, y, z, roll_deg, pitch_deg, yaw_deg):
-        transformedPoints = Math.transformArray(points, x, y, z, roll_deg, pitch_deg, yaw_deg)
+    def drawPoints(self, points, x, y, z, roll_deg, pitch_deg, yaw_deg) -> None:
+        self.trackingPointsCurrently = Math.transformArray(points, x, y, z, roll_deg, pitch_deg, yaw_deg)
 
-        self.ax.scatter(*transformedPoints[0], s=20, color='r')
-        self.ax.scatter(*transformedPoints[1], s=20, color='g')
-        self.ax.scatter(*transformedPoints[2], s=20, color='b')
+        self.ax.scatter(*self.trackingPointsCurrently[0], s=20, color='r')
+        self.ax.scatter(*self.trackingPointsCurrently[1], s=20, color='g')
+        self.ax.scatter(*self.trackingPointsCurrently[2], s=20, color='b')
+    
+    def projectPoints(self) -> None:
+        """
+        Project the tracking points, onto the camera sensor.
+        """
+        projectedPoints = Math.projectPoints(self.trackingPointsCurrently, self.Camera.focalLength, *self.Camera.position, *self.Camera.orientation)
+
+        self.ax.scatter(*projectedPoints[0], s=20, color='r')
+        self.ax.scatter(*projectedPoints[1], s=20, color='g')
+        self.ax.scatter(*projectedPoints[2], s=20, color='b')
