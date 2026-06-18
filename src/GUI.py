@@ -1,14 +1,20 @@
 import tkinter as tk
 from tkinter import ttk
+
 from Math import Math
+from plot import Matplotlib3DView, MatplotlibCameraView
+from Camera import Camera
 
 class PoseControlPanel(ttk.Frame):
     """Slider controls for translation and orientation."""
 
-    def __init__(self, parent, view):
+    def __init__(self, parent, View3D: Matplotlib3DView, Camera: Camera):
         super().__init__(parent)
 
-        self.view = view
+        self.View3D = View3D
+        # Placed inside this class because it is placed inside the control panel.
+        self.ViewCamera = MatplotlibCameraView(self, Camera)
+
         self.entryVars = {}
         self.scaleVars = {}
 
@@ -73,7 +79,6 @@ class PoseControlPanel(ttk.Frame):
             entry.bind("<FocusOut>", self.syncScaleEntry)
             self.entryVars[name] = entryVar
 
-
         self.columnconfigure(1, weight=1)
         
         self.resetButton = ttk.Button(
@@ -90,7 +95,18 @@ class PoseControlPanel(ttk.Frame):
             padx=5,
             pady=(15, 5)
         )
-        
+
+        self.ViewCamera.grid(
+            row=7,
+            column=0,
+            columnspan=3,
+            sticky="nsew"
+            # padx=5,
+            # pady=3
+        )
+        projectedPoints = self.updatePlot()
+        # self.ViewCamera.drawView(projectedPoints)
+
     def syncScaleEntry(self, event) -> None:
         """Make sure that when the entry changes the sclae updates."""
         for varName in self.scaleVars:
@@ -106,9 +122,9 @@ class PoseControlPanel(ttk.Frame):
         self.updatePlot()
 
     def updatePlot(self):
-        """Update the plot, when one of the sclae values changes."""
+        """Update the plot, when one of the scale values changes."""
 
-        self.view.update(
+        points = self.View3D.update(
             self.scaleVars["X"].get(),
             self.scaleVars["Y"].get(),
             self.scaleVars["Z"].get(),
@@ -116,6 +132,8 @@ class PoseControlPanel(ttk.Frame):
             self.scaleVars["Pitch"].get(),
             self.scaleVars["Yaw"].get(),
         )
+        
+        self.ViewCamera.drawView(points)
     
     def resetPlot(self):
         print(self.scaleVars)

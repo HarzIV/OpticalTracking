@@ -12,7 +12,7 @@ from Camera import Camera
 class Matplotlib3DView(ttk.Frame):
     """Embedded matplotlib 3D viewport."""
 
-    def __init__(self, parent):
+    def __init__(self, parent, Camera: Camera):
         super().__init__(parent)
 
         self.figure = Figure(figsize=(6, 5), dpi=100)
@@ -28,33 +28,35 @@ class Matplotlib3DView(ttk.Frame):
         self.trackingPointsCurrently = Math.arrangePoints(3, 1) # Current position of points, after aplying all transformations.
 
         # Set up the camera
-        self.Camera = Camera("OV2640", (3.59, 2.684), 3.6)
+        self.Camera = Camera
         
         self.update(0, 0, 0, 0, 0, 0)
 
-    def _setup_axes(self):
-        self.ax.set_xlabel("X")
-        self.ax.set_ylabel("Y")
-        self.ax.set_zlabel("Z")
+    def _setup_axes(self) -> None:
+        self.ax.set_xlabel("X(mm)")
+        self.ax.set_ylabel("Y(mm)")
+        self.ax.set_zlabel("Z(mm)")
 
         self.ax.set_xlim(-5, 5)
         self.ax.set_ylim(-5, 5)
         self.ax.set_zlim(-5, 5)
 
-    def update(self, x, y, z, roll_deg, pitch_deg, yaw_deg):
+    def update(self, x, y, z, roll_deg, pitch_deg, yaw_deg) -> np.ndarray:
         """Updates the plot, by rerunning all calculations."""
         
         self.ax.clear()
         self._setup_axes()
         self.placeCamera()
         # self.drawLocalCoordinateSystem(x, y, z, roll_deg, pitch_deg, yaw_deg)
-        self.drawPoints(self.trackingPoints, x, y, z, roll_deg, pitch_deg, yaw_deg)
+        self.drawTrackingPoints(self.trackingPoints, x, y, z, roll_deg, pitch_deg, yaw_deg)
         
-        self.projectPoints()
+        projectedPoints = self.projectPoints()
         
         self.canvas.draw_idle()
+        
+        return projectedPoints
 
-    def drawLocalCoordinateSystem(self, x_origin, y_origin, z_origin, roll_deg, pitch_deg, yaw_deg):
+    def drawLocalCoordinateSystem(self, x_origin, y_origin, z_origin, roll_deg, pitch_deg, yaw_deg) -> None:
         self.ax.clear()
         self._setup_axes()
 
@@ -116,14 +118,14 @@ class Matplotlib3DView(ttk.Frame):
         
         self.ax.scatter(x, y, z, color="lightblue", alpha=0.9)
 
-    def drawPoints(self, points, x, y, z, roll_deg, pitch_deg, yaw_deg) -> None:
+    def drawTrackingPoints(self, points, x, y, z, roll_deg, pitch_deg, yaw_deg) -> None:
         self.trackingPointsCurrently = Math.transformArray(points, x, y, z, roll_deg, pitch_deg, yaw_deg)
 
         self.ax.scatter(*self.trackingPointsCurrently[0], s=20, color='r')
         self.ax.scatter(*self.trackingPointsCurrently[1], s=20, color='g')
         self.ax.scatter(*self.trackingPointsCurrently[2], s=20, color='b')
     
-    def projectPoints(self) -> None:
+    def projectPoints(self) -> np.ndarray:
         """
         Project the tracking points, onto the camera sensor.
         """
@@ -132,3 +134,48 @@ class Matplotlib3DView(ttk.Frame):
         self.ax.scatter(*projectedPoints[0], s=20, color='r')
         self.ax.scatter(*projectedPoints[1], s=20, color='g')
         self.ax.scatter(*projectedPoints[2], s=20, color='b')
+
+        return projectedPoints
+
+class MatplotlibCameraView(ttk.Frame):
+    """Embedded matplotlib 2D viewport."""
+
+    def __init__(self, parent, Camera: Camera) -> None:
+        super().__init__(parent)
+
+        self.Camera = Camera
+
+        self.figure = Figure(dpi=80)
+        self.cameraViewPlot = self.figure.add_subplot(111)
+
+        self.canvas = FigureCanvasTkAgg(self.figure, master=self)
+        self.canvas.get_tk_widget().pack(fill="both", expand=True)
+
+    def setupAxes(self) -> None:
+        sensorWidth = self.Camera.sensorSize[0]
+        sensorHeight = self.Camera.sensorSize[1]
+        
+        self.cameraViewPlot.set_xlabel(f"{sensorWidth}mm")
+        self.cameraViewPlot.set_ylabel(f"{sensorHeight}mm")
+
+        self.cameraViewPlot.set_xlim(0, sensorWidth)
+        self.cameraViewPlot.set_ylim(0, sensorHeight)
+
+        self.cameraViewPlot.grid(visible=True, axis="both")
+    
+    def drawView(self, points: np.ndarray) -> None:
+        self.cameraViewPlot.clear()
+        self.setupAxes()
+
+        fittedPoints = Math.fitPointsToRect(points[:, :2], *self.Camera.sensorSize)
+
+        try:
+            self.cameraViewPlot.scatter(*fittedPoints[0], s=20, color='r')
+            self.cameraViewPlot.scatter(*fittedPoints[1], s=20, color='g')
+            self.cameraViewPlot.scatter(*fittedPoints[2], s=20, color='b')
+        except Exception as Error:
+            # Incase the points are invalid.
+            print(Error)
+            print(fittedPoints)
+
+        self.canvas.draw_idle()

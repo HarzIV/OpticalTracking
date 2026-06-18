@@ -92,3 +92,20 @@ class Math():
         correctedPoints = projectedPoints/(-projectedPoints[:, 2]) - np.array([0, 0, focalLength-1])
         
         return correctedPoints
+    
+    @staticmethod
+    def fitPointsToRect(points: np.ndarray, width: float, height: float) -> np.ndarray:
+        """
+        Fit a list of 2d points into a rectangle.
+        The origin of the points must be at the center of the rectangle.
+
+        Args:
+            points (np.ndarray): List of point to fit.
+            width (float): Width of the rectangle.
+            height (float): Height of the rectangle.
+        """
+        print(points)
+        fittedPoints = points + np.array([width/2, height/2])
+        print(fittedPoints)
+        
+        return fittedPoints
