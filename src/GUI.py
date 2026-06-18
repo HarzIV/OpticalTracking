@@ -9,7 +9,8 @@ class PoseControlPanel(ttk.Frame):
         super().__init__(parent)
 
         self.view = view
-        self.vars = {}
+        self.entryVars = {}
+        self.scaleVars = {}
 
         controls = [
             ("X", -5, 5),
@@ -39,18 +40,16 @@ class PoseControlPanel(ttk.Frame):
             )
 
             # Listener variable
-            var = tk.DoubleVar(value=self.defaultValues[name])
-            
-            self.vars[name] = var
+            varScale = tk.DoubleVar(value=self.defaultValues[name])
+            self.scaleVars[name] = varScale
 
             scale = ttk.Scale(
                 self,
                 from_=mn,
                 to=mx,
-                variable=var,
-                command=self._on_change
+                variable=varScale,
+                command=self.syncEntryScale
             )
-
             scale.grid(
                 row=row,
                 column=1,
@@ -58,15 +57,22 @@ class PoseControlPanel(ttk.Frame):
                 padx=5
             )
 
-            value_label = ttk.Label(self, width=8)
-            value_label.grid(row=row, column=2)
+            entryVar = tk.DoubleVar(value=self.defaultValues[name])
+            self.entryVars[name] = entryVar
 
-            def update_label(*_, v=var, lbl=value_label):
-                lbl.config(text=f"{v.get():.1f}")
-                
+            entry = ttk.Entry(self, textvariable=entryVar, width=5, justify="center")
+            entry.grid(
+                row=row,
+                column=2,
+                sticky="w",
+                padx=5,
+                pady=3,
+                columnspan=1
+            )
+            entry.bind("<Return>", self.syncScaleEntry)
+            entry.bind("<FocusOut>", self.syncScaleEntry)
+            self.entryVars[name] = entryVar
 
-            var.trace_add("write", update_label)
-            update_label()
 
         self.columnconfigure(1, weight=1)
         
@@ -84,22 +90,37 @@ class PoseControlPanel(ttk.Frame):
             padx=5,
             pady=(15, 5)
         )
+        
+    def syncScaleEntry(self, event) -> None:
+        """Make sure that when the entry changes the sclae updates."""
+        for varName in self.scaleVars:
+            self.scaleVars[varName].set(self.entryVars[varName].get())
+        
+        self.updatePlot()
 
-    def _on_change(self, _=None):
-        """Update the plot, when one of the slider values changes."""
+    def syncEntryScale(self, _=None) -> None:
+        """Make sure that when the scle changes the entry updates."""
+        for varName in self.entryVars:
+            self.entryVars[varName].set(self.scaleVars[varName].get())
+            
+        self.updatePlot()
+
+    def updatePlot(self):
+        """Update the plot, when one of the sclae values changes."""
 
         self.view.update(
-            self.vars["X"].get(),
-            self.vars["Y"].get(),
-            self.vars["Z"].get(),
-            self.vars["Roll"].get(),
-            self.vars["Pitch"].get(),
-            self.vars["Yaw"].get(),
+            self.scaleVars["X"].get(),
+            self.scaleVars["Y"].get(),
+            self.scaleVars["Z"].get(),
+            self.scaleVars["Roll"].get(),
+            self.scaleVars["Pitch"].get(),
+            self.scaleVars["Yaw"].get(),
         )
     
     def resetPlot(self):
-        print(self.vars)
-        for name in self.vars:
-            self.vars[name].set(value=self.defaultValues[name])
+        print(self.scaleVars)
+        for name in self.scaleVars:
+            self.scaleVars[name].set(value=self.defaultValues[name])
+            self.entryVars[name].set(value=self.defaultValues[name])
         
-        self._on_change()
+        self.updatePlot()
